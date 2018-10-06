@@ -12,10 +12,10 @@ contract RootChain {
     struct Transfer {
         address oldOwner;
         address newOwner;
+        uint256 oldBlkNum;
         uint8 sigV;
         bytes32 sigR;
         bytes32 sigS;
-        uint256 oldBlkNum;
     }
 
     struct IncludedTransfer {
@@ -70,6 +70,7 @@ contract RootChain {
     uint256[] public coins;
     mapping(uint256 => mapping(address => Exit)) exits;
     mapping(uint256 => mapping(address => mapping(uint256 => IncludedTransfer))) challenges;
+    mapping(uint256 => bool) isDeposit;
 
     constructor ()
         public
@@ -90,9 +91,16 @@ contract RootChain {
         payable
         public
     {
+        isDeposit[coins.length] = true;
+        childBlockRoots.push(keccak256(abi.encode(coins.length, Transfer({
+            oldOwner: msg.sender,
+            newOwner: msg.sender,
+            oldBlkNum: 0,
+            sigV: uint8(0),
+            sigR: bytes32(0),
+            sigS: bytes32(0)
+        }))));
         coins.push(msg.value);
-        // todo
-        // childBlockRoots.push(abi.encode(coinId, ));
     }
 
     function checkInclusion(
@@ -107,10 +115,13 @@ contract RootChain {
 
     function checkSignatures(
         uint256 coinId,
-        Transfer txn
-    ) internal pure returns (bool) {
-        bytes32 txnDigest = keccak256(abi.encode(coinId, txn));
-        return (txn.oldOwner == ecrecover(txnDigest, txn.sigV, txn.sigR, txn.sigS));
+        IncludedTransfer itxn
+    ) internal view returns (bool) {
+        if (isDeposit[itxn.blkNum]) {
+            return true;
+        }
+        bytes32 txnDigest = keccak256(abi.encode(coinId, itxn.txn));
+        return (itxn.txn.oldOwner == ecrecover(txnDigest, itxn.txn.sigV, itxn.txn.sigR, itxn.txn.sigS));
     }
 
     // @dev Starts to exit a transaction producing an output C
@@ -135,8 +146,11 @@ contract RootChain {
         require(c.txn.oldOwner == pc.txn.newOwner);
 
         // check signatures
-        require(checkSignatures(coinId, c.txn));
-        require(checkSignatures(coinId, pc.txn));
+        require(checkSignatures(coinId, c));
+        require(checkSignatures(coinId, pc));
+
+        // check separation
+        require(pc.blkNum < c.blkNum || isDeposit[c.blkNum]);
 
         // Record the exit tx.
         require(exits[coinId][msg.sender].stage == ExitStage.NOT_STARTED);
