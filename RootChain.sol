@@ -15,7 +15,7 @@ contract RootChain {
         uint8 sigV;
         bytes32 sigR;
         bytes32 sigS;
-        uint256 oldBlkNum; // todo: can we remove this?
+        uint256 oldBlkNum;
     }
 
     struct IncludedTransfer {
@@ -79,7 +79,6 @@ contract RootChain {
 
     // @dev Allows Plasma chain operator to submit block root
     // @param blkRoot The root of a transaction SMT
-    // todo(ldct): miners can reorder transactions. commit to order
     function submitBlock(bytes32 blkRoot)
         public
     {
@@ -93,7 +92,7 @@ contract RootChain {
     {
         coins.push(msg.value);
         // todo
-        childBlockRoots.push(bytes32(0));
+        // childBlockRoots.push(abi.encode(coinId, ));
     }
 
     function checkInclusion(
