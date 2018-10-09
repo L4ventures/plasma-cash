@@ -1,3 +1,2 @@
-git+git://github.com/ethereum/py-evm.git
-eth-tester
-eth-hash[pycryptodome]
+bitcoin
+ethereum

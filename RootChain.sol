@@ -41,7 +41,7 @@ contract RootChain {
         bytes32 rootHash,
         bytes proof
     )
-        internal
+        public
         pure
         returns (bool)
     {
@@ -107,7 +107,7 @@ contract RootChain {
         uint256 coinId,
         IncludedTransfer itxn,
         bytes txnProof
-    ) internal view returns (bool) {
+    ) public view returns (bool) {
         bytes32 blkRoot = childBlockRoots[itxn.blkNum];
         bytes32 digest = keccak256(abi.encode(coinId, itxn.txn));
         return checkMembership(digest, coinId, blkRoot, txnProof);
@@ -116,7 +116,7 @@ contract RootChain {
     function checkSignatures(
         uint256 coinId,
         IncludedTransfer itxn
-    ) internal view returns (bool) {
+    ) public view returns (bool) {
         if (isDeposit[itxn.blkNum]) {
             return true;
         }
@@ -168,7 +168,7 @@ contract RootChain {
         IncludedTransfer a,
         IncludedTransfer b,
         uint256 deadline
-    ) internal pure returns (bool) {
+    ) public pure returns (bool) {
         return (
             a.blkNum < b.blkNum
             && a.txn.newOwner == b.txn.oldOwner
