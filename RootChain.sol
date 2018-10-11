@@ -4,7 +4,7 @@ pragma experimental "ABIEncoderV2";
 contract RootChain {
 
     enum ExitStage {
-        NOT_STARTED, // default unitialized
+        NOT_STARTED, // default unintialized
         STARTED,
         FINISHED
     }
@@ -178,14 +178,9 @@ contract RootChain {
     }
 
     // @dev Challenge an exit transaction
-    // @param uid The id to specify the exit transaction
-    // @param challengeTx The transaction in bytes that user wants to challenge the exit
-    // @param proof The merkle proof of the challenge transaction
-    // @param blkNum The block number of the challenge transaction
     function challengeExit(
         uint256 coinId,
         address exitBeneficiary,
-
         IncludedTransfer cs,
         bytes csProof
     ) public {
