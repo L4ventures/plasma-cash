@@ -1,28 +1,5 @@
 #!./venv/bin/python3
 
-import json
-
-with open("contracts.json") as f:
-    rootchain = json.loads(f.read())['contracts']['RootChain.sol:RootChain']['abi']
-    rootchain = json.loads(rootchain)
-
-functions = dict()
-
-for elem in rootchain:
-    if elem['type'] == 'function':
-        functions[elem['name']] = elem
-    elif elem['type'] == 'constructor':
-        functions['constructor'] = elem
-
-def decode_input(inp):
-    if inp['type'] == 'tuple':
-        return "(" + ",".join(decode_input(component) for component in inp['components']) + ")"
-    else:
-        return inp['type']
-
-def decode_inputs(fn):
-    return "(" + ",".join(decode_input(inp) for inp in fn['inputs']) + ")"
-
 import binascii
 import bitcoin
 import ethereum
@@ -31,6 +8,8 @@ import eth_abi
 
 from ethereum.tools import tester
 from ethereum.tools._solidity import get_solidity
+
+import rootchain_abi
 
 def sign(h, priv):
     assert len(h) == 32
@@ -60,7 +39,7 @@ assert(RootChain.checkMembership(deposit_block, 0, deposit_block, "0x"))
 def Transfer(*args): return tuple(args)
 def IncludedTransfer(*args): return tuple(args)
 
-startExitSig = decode_inputs(functions['startExit'])
+startExitSig = rootchain_abi.decode_inputs(rootchain_abi.functions['startExit'])
 selector = ethereum.utils.sha3("startExit" + startExitSig)[0:4]
 
 myAddr = tester.a1
