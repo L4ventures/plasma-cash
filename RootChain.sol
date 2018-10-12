@@ -9,6 +9,11 @@ contract RootChain {
         FINISHED
     }
 
+    struct S {
+        uint256 a;
+        uint256 b;
+    }
+
     struct Transfer {
         address oldOwner;
         address newOwner;
@@ -154,14 +159,17 @@ contract RootChain {
 
         // Record the exit tx.
         require(exits[coinId][msg.sender].stage == ExitStage.NOT_STARTED);
-        exits[coinId][msg.sender] = Exit({
-            stage: ExitStage.STARTED,
-            challengeDeadline: block.number + 100,
-            c: c,
-            pc: pc,
-            numChallenges: 0,
-            coinId: coinId
-        });
+
+        // gas limit nonsense
+
+        // exits[coinId][msg.sender] = Exit({
+        //     stage: ExitStage.STARTED,
+        //     challengeDeadline: block.number + 100,
+        //     c: c,
+        //     pc: pc,
+        //     numChallenges: 0,
+        //     coinId: coinId
+        // });
     }
 
     function spends(
