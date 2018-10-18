@@ -31,10 +31,12 @@ contract RootChain {
     struct Exit {
         ExitStage stage;
         uint256 challengeDeadline;
-        IncludedTransfer c;
-        IncludedTransfer pc;
         uint256 numChallenges;
         uint256 coinId;
+        address cOwner;
+        address pcOwner;
+        uint256 cBlkNum;
+        uint256 pcBlkNum;
     }
 
     /**
@@ -160,15 +162,17 @@ contract RootChain {
         // Record the exit tx.
         require(exits[coinId][msg.sender].stage == ExitStage.NOT_STARTED);
 
-        // gas limit nonsense
+        // todo: gas limit nonsense
 
         // exits[coinId][msg.sender] = Exit({
         //     stage: ExitStage.STARTED,
         //     challengeDeadline: block.number + 100,
-        //     c: c,
-        //     pc: pc,
         //     numChallenges: 0,
-        //     coinId: coinId
+        //     coinId: coinId,
+        //     cOwner: c.txn.newOwner,
+        //     pcOwner: pc.txn.newOwner,
+        //     cBlkNum: c.blkNum,
+        //     pcBlkNum: pc.blkNum
         // });
     }
 
@@ -195,16 +199,23 @@ contract RootChain {
         require(exits[coinId][exitBeneficiary].stage == ExitStage.STARTED);
         require(checkInclusion(coinId, cs, csProof));
 
+        Exit storage exit = exits[coinId][exitBeneficiary];
+
         if ( /* Type 1: C has been spent */
-            spends(exits[coinId][exitBeneficiary].c, cs, uint256(-1))
+            (exit.cBlkNum < cs.blkNum)
+            && (exit.cBlkNum == cs.txn.oldBlkNum)
+            && (exit.cOwner == cs.txn.oldOwner)
         ) {
             exits[coinId][exitBeneficiary].stage = ExitStage.FINISHED;
         } else if ( /* Type 2: P(C) has been spent before C */
-            spends(exits[coinId][exitBeneficiary].pc, cs, exits[coinId][exitBeneficiary].c.blkNum)
+            (exit.pcBlkNum < cs.blkNum)
+            && (exit.pcOwner == cs.txn.newOwner)
+            && (exit.pcBlkNum == cs.txn.oldBlkNum)
+            && (cs.blkNum < exit.cBlkNum)
         ) {
             exits[coinId][exitBeneficiary].stage = ExitStage.FINISHED;
         } else if ( /* Type 3: Challenger provides a tx in history. Exitor needs to respond it. */
-            cs.blkNum < exits[coinId][exitBeneficiary].pc.blkNum
+            cs.blkNum < exits[coinId][exitBeneficiary].pcBlkNum
         ) {
             challenges[coinId][exitBeneficiary][cs.blkNum] = cs;
             exits[coinId][exitBeneficiary].numChallenges += 1;
