@@ -9,11 +9,6 @@ contract RootChain {
         FINISHED
     }
 
-    struct S {
-        uint256 a;
-        uint256 b;
-    }
-
     struct Transfer {
         address oldOwner;
         address newOwner;
@@ -32,8 +27,6 @@ contract RootChain {
         ExitStage stage;
         uint256 challengeDeadline;
         uint256 numChallenges;
-        uint256 coinId;
-        address cOwner;
         address pcOwner;
         uint256 cBlkNum;
         uint256 pcBlkNum;
@@ -54,6 +47,8 @@ contract RootChain {
     {
         bytes32 proofElement;
         bytes32 computedHash = leaf;
+
+        require(proof.length == 256);
 
         for (uint256 i = 32; i <= proof.length; i += 32) {
             assembly {
@@ -76,8 +71,9 @@ contract RootChain {
     bytes32[] public childBlockRoots;
     uint256[] public coins;
     mapping(uint256 => mapping(address => Exit)) exits;
+    mapping(uint256 => mapping(address => bytes32)) exitHashes;
     mapping(uint256 => mapping(address => mapping(uint256 => IncludedTransfer))) challenges;
-    mapping(uint256 => bool) isDeposit;
+    uint256[] coinDepositBlkNum;
 
     constructor ()
         public
@@ -98,15 +94,8 @@ contract RootChain {
         payable
         public
     {
-        isDeposit[coins.length] = true;
-        childBlockRoots.push(keccak256(abi.encode(coins.length, Transfer({
-            oldOwner: msg.sender,
-            newOwner: msg.sender,
-            oldBlkNum: 0,
-            sigV: uint8(0),
-            sigR: bytes32(0),
-            sigS: bytes32(0)
-        }))));
+        coinDepositBlkNum.push(childBlockRoots.length);
+        childBlockRoots.push(bytes32(0));
         coins.push(msg.value);
     }
 
@@ -115,20 +104,25 @@ contract RootChain {
         IncludedTransfer itxn,
         bytes txnProof
     ) public view returns (bool) {
+        if (itxn.blkNum == coinDepositBlkNum[coinId]) return true;
+        bytes32 txnDigest = keccak256(abi.encode(coinId, itxn.txn));
+        if (itxn.txn.oldOwner != ecrecover(txnDigest, itxn.txn.sigV, itxn.txn.sigR, itxn.txn.sigS)) return false;
         bytes32 blkRoot = childBlockRoots[itxn.blkNum];
         bytes32 digest = keccak256(abi.encode(coinId, itxn.txn));
         return checkMembership(digest, coinId, blkRoot, txnProof);
     }
 
-    function checkSignatures(
-        uint256 coinId,
-        IncludedTransfer itxn
-    ) public view returns (bool) {
-        if (isDeposit[itxn.blkNum]) {
-            return true;
-        }
-        bytes32 txnDigest = keccak256(abi.encode(coinId, itxn.txn));
-        return (itxn.txn.oldOwner == ecrecover(txnDigest, itxn.txn.sigV, itxn.txn.sigR, itxn.txn.sigS));
+    function startExitOfDeposit(
+        uint256 coinId
+    ) {
+        exits[coinId][msg.sender] = Exit({
+            stage: ExitStage.STARTED,
+            challengeDeadline: block.number + 100,
+            numChallenges: 0,
+            pcOwner: address(0),
+            cBlkNum: coinDepositBlkNum[coinId],
+            pcBlkNum: uint256(0)
+        });
     }
 
     // @dev Starts to exit a transaction producing an output C
@@ -152,28 +146,22 @@ contract RootChain {
         // check owners match
         require(c.txn.oldOwner == pc.txn.newOwner);
 
-        // check signatures
-        require(checkSignatures(coinId, c));
-        require(checkSignatures(coinId, pc));
-
         // check separation
-        require(pc.blkNum < c.blkNum || isDeposit[c.blkNum]);
+        require(pc.blkNum < c.blkNum);
 
         // Record the exit tx.
         require(exits[coinId][msg.sender].stage == ExitStage.NOT_STARTED);
 
         // todo: gas limit nonsense
 
-        // exits[coinId][msg.sender] = Exit({
-        //     stage: ExitStage.STARTED,
-        //     challengeDeadline: block.number + 100,
-        //     numChallenges: 0,
-        //     coinId: coinId,
-        //     cOwner: c.txn.newOwner,
-        //     pcOwner: pc.txn.newOwner,
-        //     cBlkNum: c.blkNum,
-        //     pcBlkNum: pc.blkNum
-        // });
+        exits[coinId][msg.sender] = Exit({
+            stage: ExitStage.STARTED,
+            challengeDeadline: block.number + 100,
+            numChallenges: 0,
+            pcOwner: pc.txn.newOwner,
+            cBlkNum: c.blkNum,
+            pcBlkNum: pc.blkNum
+        });
     }
 
     function spends(
@@ -204,7 +192,7 @@ contract RootChain {
         if ( /* Type 1: C has been spent */
             (exit.cBlkNum < cs.blkNum)
             && (exit.cBlkNum == cs.txn.oldBlkNum)
-            && (exit.cOwner == cs.txn.oldOwner)
+            && (exitBeneficiary == cs.txn.oldOwner)
         ) {
             exits[coinId][exitBeneficiary].stage = ExitStage.FINISHED;
         } else if ( /* Type 2: P(C) has been spent before C */
@@ -244,7 +232,7 @@ contract RootChain {
         require(block.number >= exit.challengeDeadline);
         require(exit.numChallenges == 0);
 
-        exitBeneficiary.transfer(coins[exit.coinId]);
+        exitBeneficiary.transfer(coins[coinId]);
         exit.stage = ExitStage.FINISHED;
     }
 }

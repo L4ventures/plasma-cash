@@ -30,11 +30,11 @@ assert(RootChain.authority(sender=tester.k1) == f"0x{tester.a0.hex()}")
 
 RootChain.deposit(sender=tester.k1, value=5)
 
+c.mine() # bump gas limit
+
 assert(RootChain.coins(0) == 5)
 
 deposit_block = RootChain.childBlockRoots(0)
-
-assert(RootChain.checkMembership(deposit_block, 0, deposit_block, "0x"))
 
 def Transfer(*args): return tuple(args)
 def IncludedTransfer(*args): return tuple(args)
@@ -52,4 +52,4 @@ it = IncludedTransfer(
 )
 calldata = selector + eth_abi.encode_single(startExitSig, (0, it, b"", it, b""))
 
-print(RootChain.startExit(data=calldata, sender=tester.k1))
+# print(RootChain.startExit(data=calldata, sender=tester.k1))
